@@ -1,0 +1,90 @@
+.app {
+  min-height: 100vh;
+  background: #0f1117;
+  color: #e2e8f0;
+}
+
+.header {
+  background: #1a1d27;
+  border-bottom: 1px solid #2d3148;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.headerInner {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 24px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+
+.logo {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.5px;
+}
+
+.logo span {
+  font-weight: 400;
+  color: #7c8db5;
+  margin-left: 6px;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.tab {
+  background: none;
+  border: none;
+  color: #7c8db5;
+  padding: 6px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.15s;
+}
+
+.tab:hover { background: #2d3148; color: #e2e8f0; }
+
+.tabActive {
+  background: #2d3148;
+  color: #60a5fa;
+  font-weight: 600;
+}
+
+.main {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.searchLayout {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: sticky;
+  top: 84px;
+}
+
+.content {
+  min-height: 70vh;
+}
+
+@media (max-width: 900px) {
+  .searchLayout { grid-template-columns: 1fr; }
+  .sidebar { position: static; }
+}
