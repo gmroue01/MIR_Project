@@ -28,3 +28,21 @@ export const computeMap = (descriptors, measure, topK, maxQueries = 46) =>
     top_k: topK,
     max_queries: maxQueries,
   }).then((r) => r.data);
+
+// ── CLIP / Flickr8K ────────────────────────────────────────────────────────
+
+export const getClipImages = (page = 1, pageSize = 30) =>
+  axios.get(`${BASE}/clip/images`, { params: { page, page_size: pageSize } }).then((r) => r.data);
+
+export const clipTextToImage = (query, topK = 10) =>
+  axios.post(`${BASE}/clip/text-to-image`, { query, top_k: topK }).then((r) => r.data);
+
+export const clipImageToText = (imageIdx, topK = 10) =>
+  axios.post(`${BASE}/clip/image-to-text`, { image_idx: imageIdx, top_k: topK }).then((r) => r.data);
+
+export const clipEvaluate = (imageIndices, textQueries, topK = 10) =>
+  axios.post(`${BASE}/clip/evaluate`, {
+    image_indices: imageIndices,
+    text_queries: textQueries,
+    top_k: topK,
+  }).then((r) => r.data);

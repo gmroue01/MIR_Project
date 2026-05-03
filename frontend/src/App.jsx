@@ -1,71 +1,99 @@
 import React, { useState } from "react";
 import styles from "./App.module.css";
-import ImageBrowser from "./components/ImageBrowser";
-import SearchPanel from "./components/SearchPanel";
-import ResultsPanel from "./components/ResultsPanel";
-import MetricsPanel from "./components/MetricsPanel";
-import BenchmarkPanel from "./components/BenchmarkPanel";
-import MapPanel from "./components/MapPanel";
+import Step1Photo from "./components/Step1Photo";
+import Step2Params from "./components/Step2Params";
+import Step3Results from "./components/Step3Results";
+import Step4Metrics from "./components/Step4Metrics";
+import BenchmarkPage from "./components/BenchmarkPage";
+import CLIPPage from "./components/CLIPPage";
 
-const TABS = ["Recherche", "MAP", "Benchmark"];
+const STEPS = [
+  { n: 1, label: "Photo" },
+  { n: 2, label: "Paramètres" },
+  { n: 3, label: "Résultats" },
+  { n: 4, label: "Métriques" },
+];
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState("Recherche");
+  const [page, setPage]           = useState("search");
+  const [step, setStep]           = useState(1);
   const [queryImage, setQueryImage] = useState(null);
-  const [searchResult, setSearchResult] = useState(null);
+  const [config, setConfig]       = useState({ descriptors: ["color_histogram"], measure: "euclidean", topK: 50 });
+  const [result, setResult]       = useState(null);
   const [searching, setSearching] = useState(false);
+
+  const accessible = (n) => n <= 2 || !!result;
+  const go = (n) => { if (accessible(n)) setStep(n); };
+
+  const handleSearchDone = (r) => { setResult(r); go(3); };
+  const handleNewSearch  = () => { setResult(null); setStep(1); };
 
   return (
     <div className={styles.app}>
-      <header className={styles.header}>
-        <div className={styles.headerInner}>
-          <h1 className={styles.logo}>MIR <span>Image Search</span></h1>
-          <nav className={styles.tabs}>
-            {TABS.map((t) => (
-              <button
-                key={t}
-                className={`${styles.tab} ${activeTab === t ? styles.tabActive : ""}`}
-                onClick={() => setActiveTab(t)}
-              >
-                {t}
-              </button>
-            ))}
-          </nav>
+      <div className={styles.stars} aria-hidden="true" />
+
+      <nav className={styles.nav}>
+        <span className={styles.logo}><span className={styles.star}>✦</span> MIR</span>
+        <div className={styles.navLinks}>
+          <button className={`${styles.navBtn} ${page === "search"    ? styles.navOn : ""}`} onClick={() => setPage("search")}>Recherche</button>
+          <button className={`${styles.navBtn} ${page === "benchmark" ? styles.navOn : ""}`} onClick={() => setPage("benchmark")}>Benchmark</button>
+          <button className={`${styles.navBtn} ${page === "clip"      ? styles.navOn : ""}`} onClick={() => setPage("clip")}>CLIP</button>
         </div>
-      </header>
+      </nav>
 
-      <main className={styles.main}>
-        {activeTab === "Recherche" && (
-          <div className={styles.searchLayout}>
-            <aside className={styles.sidebar}>
-              <SearchPanel
-                queryImage={queryImage}
-                onSearch={(result) => setSearchResult(result)}
-                setSearching={setSearching}
-                searching={searching}
-              />
-              {searchResult && (
-                <MetricsPanel metrics={searchResult.metrics} searchTime={searchResult.search_time_s} />
-              )}
-            </aside>
+      {page === "clip" ? (
+        <div className={styles.benchWrap}><CLIPPage /></div>
+      ) : page === "benchmark" ? (
+        <div className={styles.benchWrap}><BenchmarkPage /></div>
+      ) : (
+        <>
+          <aside className={styles.stepNav}>
+            {STEPS.map((s, i) => (
+              <React.Fragment key={s.n}>
+                <button
+                  className={[styles.dot, step === s.n && styles.dotOn, !accessible(s.n) && styles.dotOff].filter(Boolean).join(" ")}
+                  onClick={() => go(s.n)}
+                  title={s.label}
+                  disabled={!accessible(s.n)}
+                >
+                  <span className={styles.dotRing} />
+                  <span className={styles.dotCore} />
+                  <span className={styles.dotLbl}>{s.label}</span>
+                </button>
+                {i < 3 && <div className={`${styles.line} ${step > s.n ? styles.lineDone : ""}`} />}
+              </React.Fragment>
+            ))}
+          </aside>
 
-            <section className={styles.content}>
-              {!searchResult ? (
-                <ImageBrowser onSelect={setQueryImage} selectedImage={queryImage} />
-              ) : (
-                <ResultsPanel
-                  result={searchResult}
-                  onBack={() => setSearchResult(null)}
-                  onSelectNew={(img) => { setSearchResult(null); setQueryImage(img); }}
+          <div className={styles.viewport}>
+            <div
+              className={styles.slider}
+              style={{ transform: `translateY(calc(${-(step - 1)} * (100vh - 56px)))` }}
+            >
+              <section className={styles.slide}>
+                <Step1Photo selected={queryImage} onSelect={setQueryImage} onNext={() => go(2)} />
+              </section>
+              <section className={styles.slide}>
+                <Step2Params
+                  queryImage={queryImage}
+                  config={config}
+                  onChange={setConfig}
+                  onSearch={handleSearchDone}
+                  searching={searching}
+                  setSearching={setSearching}
+                  onBack={() => go(1)}
                 />
-              )}
-            </section>
+              </section>
+              <section className={styles.slide}>
+                <Step3Results result={result} onNext={() => go(4)} onNewSearch={handleNewSearch} />
+              </section>
+              <section className={styles.slide}>
+                <Step4Metrics result={result} config={config} onNewSearch={handleNewSearch} />
+              </section>
+            </div>
           </div>
-        )}
-
-        {activeTab === "MAP" && <MapPanel />}
-        {activeTab === "Benchmark" && <BenchmarkPanel />}
-      </main>
+        </>
+      )}
     </div>
   );
 }

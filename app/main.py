@@ -12,6 +12,7 @@ from app.searcher import search, get_indexing_metrics, get_all_images, _load_met
 from app.evaluation.metrics import compute_all
 from app.similarity.measures import MEASURES
 from app.config import DATASET_DIR, STATIC_DIR
+from app.clip_searcher import _searcher as clip_searcher
 
 app = FastAPI(title="MIR - Image Search Engine")
 
@@ -22,12 +23,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Serve dataset images
-app.mount("/images", StaticFiles(directory=DATASET_DIR), name="images")
+# Serve dataset images (cars)
+if os.path.isdir(DATASET_DIR):
+    app.mount("/images", StaticFiles(directory=DATASET_DIR), name="images")
 
-# Serve React build (production)
-if os.path.isdir(STATIC_DIR):
-    app.mount("/assets", StaticFiles(directory=os.path.join(STATIC_DIR, "assets")), name="assets")
+# Serve Flickr8K images
+_flickr_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Flickr8K", "Images")
+if os.path.isdir(_flickr_dir):
+    app.mount("/flickr8k", StaticFiles(directory=_flickr_dir), name="flickr8k")
+
 
 
 # ---------- Schemas ----------
@@ -197,7 +201,79 @@ def health():
     return {"status": "ok"}
 
 
-# Catch-all: serve React index.html for client-side routing (production)
+# ── CLIP / Flickr8K endpoints ──────────────────────────────────────────────
+
+class ClipTextRequest(BaseModel):
+    query: str
+    top_k: int = 10
+
+class ClipImageRequest(BaseModel):
+    image_idx: int
+    top_k: int = 10
+
+class ClipEvalRequest(BaseModel):
+    image_indices: List[int] = []
+    text_queries:  List[str] = []
+    top_k:         int = 10
+
+
+@app.get("/api/clip/images")
+def clip_images(
+    page:      int = Query(1,  ge=1),
+    page_size: int = Query(30, ge=1, le=200),
+):
+    try:
+        return clip_searcher.get_images_page(page, page_size)
+    except Exception as e:
+        raise HTTPException(503, str(e))
+
+
+@app.post("/api/clip/text-to-image")
+def clip_text_to_image(req: ClipTextRequest):
+    if not req.query.strip():
+        raise HTTPException(400, "Query must not be empty.")
+    if req.top_k not in (5, 10, 20):
+        raise HTTPException(400, "top_k must be 5, 10 or 20.")
+    try:
+        results = clip_searcher.text_to_image(req.query, req.top_k)
+        return {"query": req.query, "results": results}
+    except Exception as e:
+        raise HTTPException(503, str(e))
+
+
+@app.post("/api/clip/image-to-text")
+def clip_image_to_text(req: ClipImageRequest):
+    if req.top_k not in (5, 10, 20):
+        raise HTTPException(400, "top_k must be 5, 10 or 20.")
+    try:
+        results = clip_searcher.image_to_text(req.image_idx, req.top_k)
+        return {"image_idx": req.image_idx, "results": results}
+    except Exception as e:
+        raise HTTPException(503, str(e))
+
+
+@app.post("/api/clip/evaluate")
+def clip_evaluate(req: ClipEvalRequest):
+    if not req.image_indices and not req.text_queries:
+        raise HTTPException(400, "Provide at least one image index or text query.")
+    if req.top_k not in (5, 10, 20):
+        raise HTTPException(400, "top_k must be 5, 10 or 20.")
+    try:
+        return clip_searcher.evaluate(req.image_indices, req.text_queries, req.top_k)
+    except Exception as e:
+        raise HTTPException(503, str(e))
+
+
+# Explicit assets route (must be before the catch-all)
+@app.get("/assets/{path:path}")
+def serve_asset(path: str):
+    asset = os.path.join(STATIC_DIR, "assets", path)
+    if os.path.isfile(asset):
+        return FileResponse(asset)
+    raise HTTPException(404, "Asset not found")
+
+
+# SPA catch-all
 @app.get("/{full_path:path}")
 def serve_spa(full_path: str):
     index = os.path.join(STATIC_DIR, "index.html")

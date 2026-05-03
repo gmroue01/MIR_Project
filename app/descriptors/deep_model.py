@@ -64,8 +64,9 @@ def _preprocess(image: np.ndarray, img_size: int) -> torch.Tensor:
 
 def extract(image: np.ndarray, model_name: str) -> np.ndarray:
     model = _get_model(model_name)
-    cfg   = CONFIGS[model_name]
-    tensor = _preprocess(image, cfg["img_size"])
+    # Fine-tuned MetricModel exposes .img_size from the checkpoint; pretrained timm models don't.
+    img_size = getattr(model, "img_size", None) or CONFIGS[model_name]["img_size"]
+    tensor = _preprocess(image, img_size)
     with torch.no_grad():
         feat = model(tensor).squeeze().float().numpy()
     norm = np.linalg.norm(feat)

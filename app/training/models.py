@@ -77,10 +77,19 @@ def _apply_freeze_strategy(backbone: nn.Module, model_name: str):
 
 
 class MetricModel(nn.Module):
-    def __init__(self, model_name: str):
+    def __init__(self, model_name: str, img_size: int | None = None):
         super().__init__()
         cfg = MODEL_CONFIGS[model_name]
-        backbone = timm.create_model(cfg["timm_name"], pretrained=True, num_classes=0)
+        self.model_name = model_name
+        self.img_size   = img_size or cfg["img_size"]
+
+        # ViT-based models require img_size at creation time so timm can
+        # interpolate the position embeddings to the new grid.
+        is_vit = model_name in ("vit_base", "dinov2")
+        backbone = timm.create_model(
+            cfg["timm_name"], pretrained=True, num_classes=0,
+            **({"img_size": self.img_size} if is_vit else {}),
+        )
         self.backbone = _apply_freeze_strategy(backbone, model_name)
 
         feat_dim = cfg["feat_dim"]
@@ -89,7 +98,6 @@ class MetricModel(nn.Module):
             nn.ReLU(inplace=True),
             nn.Linear(feat_dim, EMBED_DIM),
         )
-        self.model_name = model_name
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         feats = self.backbone(x).float()
@@ -104,8 +112,9 @@ class MetricModel(nn.Module):
 
 
 def load_for_inference(model_name: str, weights_path: str) -> MetricModel:
-    model = MetricModel(model_name)
     state = torch.load(weights_path, map_location="cpu", weights_only=True)
+    img_size = state.get("hyperparams", {}).get("img_size")
+    model = MetricModel(model_name, img_size=img_size)
     model.load_state_dict(state["model_state_dict"])
     model.eval()
     return model

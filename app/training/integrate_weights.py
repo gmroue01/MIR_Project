@@ -34,9 +34,8 @@ def reindex_model(model_name: str):
 
     print(f"\n[{model_name}] Loading fine-tuned weights from {weights_path}")
     model = load_for_inference(model_name, weights_path)
-
-    cfg = MODEL_CONFIGS[model_name]
-    img_size = cfg["img_size"]
+    img_size = model.img_size  # read from checkpoint, not from MODEL_CONFIGS default
+    print(f"  img_size = {img_size}")
 
     import torchvision.transforms as T
     transform = T.Compose([

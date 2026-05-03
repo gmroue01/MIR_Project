@@ -30,10 +30,11 @@ def _load(name: str) -> np.ndarray:
 
 def _load_meta() -> Tuple[np.ndarray, np.ndarray]:
     if "_meta" not in _cache:
-        _cache["_meta"] = (
-            np.load(os.path.join(INDEX_DIR, "filenames.npy")),
-            np.load(os.path.join(INDEX_DIR, "classes.npy")),
-        )
+        f_path = os.path.join(INDEX_DIR, "filenames.npy")
+        c_path = os.path.join(INDEX_DIR, "classes.npy")
+        if not os.path.exists(f_path) or not os.path.exists(c_path):
+            return np.array([]), np.array([])
+        _cache["_meta"] = (np.load(f_path), np.load(c_path))
     return _cache["_meta"]
 
 
