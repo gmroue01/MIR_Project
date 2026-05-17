@@ -1,7 +1,40 @@
+# Environnements virtuels
+.venv/
+venv/
+
+# Cache Python
 __pycache__/
 *.pyc
-.env
-frontend/
-node_modules/
-*.md
+*.pyo
+*.pyd
+
+# Git
 .git/
+.gitignore
+
+# Node
+frontend/node_modules/
+
+# Frontend buildé localement (rebuildé dans le stage Docker)
+app/static/
+frontend/dist/
+
+# Données volumineuses (montées en volume)
+dataset/
+indexes_faiss/
+indexes/
+Flickr8K/
+
+# Fichiers de config locaux
+.env
+.claude/
+
+# Logs serveur
+server_*.txt
+
+# Notebooks et docs
+*.ipynb
+*.md
+
+# Fichiers de build macOS
+.DS_Store
