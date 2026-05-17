@@ -52,7 +52,8 @@ class CLIPSearcher:
         self.model, _, _ = open_clip.create_model_and_transforms(
             "ViT-B-32", pretrained="openai"
         )
-        self.model        = self.model.to(self.device).eval()
+        # fp16 pour réduire l'empreinte mémoire (~175 MB vs ~350 MB)
+        self.model        = self.model.to(self.device).half().eval()
         self.tokenizer    = open_clip.get_tokenizer("ViT-B-32")
         self._model_ready = True
 
