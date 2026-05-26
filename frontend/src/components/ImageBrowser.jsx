@@ -68,7 +68,6 @@ export default function ImageBrowser({ onSelect, selectedImage }) {
               <img
                 src={`/images/${img.filename}`}
                 alt={img.filename}
-                loading="lazy"
                 className={styles.thumb}
               />
             </button>

@@ -79,7 +79,7 @@ export default function Step1Photo({ selected, onSelect, onNext }) {
                 onClick={() => onSelect(img)}
                 title={img.class.replace(/_/g, " ")}
               >
-                <img src={`/images/${img.filename}`} alt={img.filename} loading="lazy" className={styles.thumb} />
+                <img src={`/images/${img.filename}`} alt={img.filename} className={styles.thumb} />
                 {selected?.index === img.index && <span className={styles.checkmark}>✓</span>}
               </button>
             ))}
