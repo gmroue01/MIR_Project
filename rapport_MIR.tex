@@ -1,0 +1,618 @@
+\documentclass[12pt,a4paper]{report}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage[top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+\usepackage{parskip}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs,array,longtable}
+\usepackage{graphicx,float,caption,subcaption}
+\usepackage{listings,xcolor}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true,linkcolor=black,urlcolor=blue,citecolor=black}
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{\leftmark}
+\lhead{MIR -- Moteur de recherche d'images}
+\cfoot{\thepage}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric,arrows.meta,positioning,fit,backgrounds}
+
+\lstdefinestyle{python}{
+  language=Python, basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{blue}, commentstyle=\color{gray},
+  stringstyle=\color{orange!80!black}, breaklines=true,
+  frame=single, numbers=left, numberstyle=\tiny\color{gray},
+}
+
+\newcommand{\todo}[1]{\textcolor{red}{\textbf{[À compléter~: #1]}}}
+
+\usepackage{titlesec}
+\titleformat{\chapter}[hang]{\LARGE\bfseries}{\thechapter.}{0.5em}{}
+\titlespacing{\chapter}{0pt}{10pt}{10pt}
+
+% ============================================================
+\begin{document}
+% ============================================================
+
+\begin{titlepage}
+  \centering\vspace*{2cm}
+  {\Huge\bfseries Moteur de recherche d'images\par}
+  \vspace{0.4cm}
+  {\LARGE Multimodal Image Retrieval (MIR)\par}
+  \vspace{1.5cm}
+  {\large Rapport de projet -- Premier jet\par}
+  \vspace{0.8cm}
+  \rule{\textwidth}{0.5pt}\vspace{0.8cm}
+
+  \begin{tabular}{ll}
+    \textbf{Partie 1} & Moteur de recherche unimodal \\[3pt]
+    \textbf{Partie 2} & Moteur de recherche multimodal \\[3pt]
+    \textbf{Partie 3} & Déploiement cloud et infrastructure \\
+  \end{tabular}
+
+  \vspace{1.5cm}\rule{\textwidth}{0.5pt}\vspace{0.8cm}
+  {\large \today\par}\vspace{0.5cm}
+  {\normalsize \url{https://github.com/gmroue01/MIR_Project}\par}
+  \vfill
+\end{titlepage}
+
+\tableofcontents\newpage
+
+% ============================================================
+\chapter*{Introduction}
+\addcontentsline{toc}{chapter}{Introduction}
+% ============================================================
+
+Ce rapport décrit la conception et l'implémentation d'un moteur de recherche d'images accessible via une interface web. Le projet comprend deux volets : une recherche unimodale par contenu visuel sur un corpus de voitures, et une recherche multimodale texte-image fondée sur le modèle CLIP. Un troisième axe traite du déploiement en environnement cloud.
+
+Le backend est développé en Python (FastAPI), le frontend en React/Vite. Toute l'inférence s'exécute sur CPU. Les sections marquées \textcolor{red}{\textbf{[À compléter]}} correspondent aux données expérimentales ou d'infrastructure non encore disponibles au moment de la rédaction.
+
+% ============================================================
+\part{Moteur de recherche unimodal}
+% ============================================================
+
+\chapter{Données, évaluation et descripteurs}
+
+\section{Corpus et protocole}
+
+Le corpus contient \textbf{5\,000 images de voitures} réparties en \textbf{46 classes}. Chaque classe désigne un couple marque/modèle précis, encodé dans le nom de fichier selon la convention \texttt{brandId\_modelId\_Brand\_Model\_index.jpg}. Les quatre premiers champs constituent l'identifiant de classe.
+
+La pertinence est définie strictement : deux images sont pertinentes l'une envers l'autre si elles appartiennent à la même classe. Pour une requête de classe $c$ comportant $N_c$ images, le nombre de documents pertinents est $N_c - 1$.
+
+Pour le calcul de la MAP, une image par classe est utilisée comme requête (la première par ordre alphabétique de nom de fichier), soit 46 requêtes. Deux profondeurs de retrieval sont testées : top-20 et top-50.
+
+\todo{Distribution des effectifs par classe et par marque.}
+
+\section{Descripteurs visuels}
+
+Huit descripteurs sont implémentés, couvrant trois familles : bas niveau (couleur, texture), points d'intérêt, et représentations profondes.
+
+\subsection*{Histogramme de couleur (24 dim.)}
+
+Histogramme RGB avec 8 bins par canal, normalisé en L1. Dimension finale : $3 \times 8 = 24$. La normalisation L1 ramène le vecteur à une distribution de probabilité, compatible avec Jensen-Shannon. Le descripteur est invariant à la rotation mais sensible aux changements d'illumination.
+
+\subsection*{HOG -- Histogram of Oriented Gradients (8\,100 dim.)}
+
+Implémenté via \texttt{cv2.HOGDescriptor} sur une image en niveaux de gris redimensionnée à $128 \times 128$ px. Paramètres : blocs $16 \times 16$ px, pas $8 \times 8$ px, cellules $8 \times 8$ px, 9 bins d'orientation. La dimension résultante est :
+
+\[
+  \left(\frac{128-16}{8}+1\right)^2 \times \left(\frac{16}{8}\right)^2 \times 9
+  = 15^2 \times 4 \times 9 = 8\,100
+\]
+
+Le vecteur est normalisé en L2. Pour les mesures Jensen-Shannon et Chi-deux, une ACP le réduit à 256 dimensions (voir section \ref{sec:pca}).
+
+\subsection*{SIFT (128 dim.)}
+
+Détecteur SIFT (\texttt{nfeatures=500}) appliqué sur image en niveaux de gris. Les descripteurs des points détectés sont moyennés (\emph{mean pooling}) en un unique vecteur de 128 dimensions, normalisé en L2. Si aucun point n'est détecté, un vecteur nul est retourné.
+
+\subsection*{ORB (32 dim.)}
+
+Détecteur ORB (\texttt{nfeatures=500}) combinant FAST et BRIEF. Deux représentations coexistent : un vecteur flottant 32 dimensions (mean pooling des descripteurs, normalisé L2) pour les mesures générales, et les descripteurs binaires bruts ($N \times 32$ uint8) réservés à la distance de Hamming.
+
+\subsection*{MobileNetV2 (1\,280 dim. / 256 dim. fine-tuné)}
+
+Réseau léger à blocs \emph{inverted residuals} \cite{sandler2018}, chargé via \texttt{timm} (\texttt{mobilenetv2\_100.ra\_in1k}), entrée $224 \times 224$ px. La sortie du global average pooling (1\,280 dim.) sert de descripteur en mode pré-entraîné. Un fine-tuning par apprentissage métrique (triplet loss, hard mining \cite{hermans2017}) sur Google Colab (GPU T4) ajoute une tête de projection $1\,280 \to 512 \to 256$ avec normalisation L2 finale.
+
+\todo{Courbes de perte et Recall@1 du fine-tuning.}
+
+\subsection*{ResNet50 (2\,048 dim.)}
+
+Architecture à connexions résiduelles \cite{he2016}, modèle \texttt{resnet50.a1\_in1k} via timm, entrée $224 \times 224$ px. Pas de fine-tuning sur ce corpus. Sortie : vecteur 2\,048 dim. du global average pooling.
+
+\subsection*{ViT-Base (768 dim.)}
+
+Vision Transformer \cite{dosovitskiy2020} (\texttt{vit\_base\_patch16\_224.augreg\_in1k}), patches $16 \times 16$ px, entrée $224 \times 224$ px. Le token CLS produit un embedding de 768 dim. Poids pré-entraînés ImageNet, pas de fine-tuning.
+
+\subsection*{DinoV2 (384 dim.)}
+
+ViT-Small pré-entraîné en auto-supervision sur 142 millions d'images par FAIR \cite{oquab2023} (\texttt{vit\_small\_patch14\_dinov2.lvd142m}), entrée $518 \times 518$ px (nécessaire pour les patches 14 px). Sortie 384 dim. Un fine-tuning avec tête de projection $768 \to 512 \to 256$ (ViT-Base backbone) a été réalisé sur Colab.
+
+\todo{Résultats du fine-tuning DinoV2.}
+
+\section{Métriques d'indexation}
+
+\begin{table}[H]
+  \centering
+  \begin{tabular}{lrrrr}
+    \toprule
+    Descripteur & Dim. & Taille (Mo) & Index. (s) & ms/img \\
+    \midrule
+    color\_histogram & 24      & 0.39   & 40.0    & 1.1   \\
+    hog              & 8\,100  & 121.1  & 26.6    & 0.7   \\
+    sift             & 128     & 2.1    & 311.8   & 56.6  \\
+    orb              & 32      & 0.5    & 48.2    & 6.0   \\
+    mobilenetv2      & 1\,280  & 14.0   & 484.0   & 85.5  \\
+    resnet50         & 2\,048  & 22.3   & 325.8   & 60.2  \\
+    vit\_base        & 768     & 13.6   & 619.2   & 119.1 \\
+    dinov2           & 384     & 6.8    & 1\,692.9 & 333.4 \\
+    \bottomrule
+  \end{tabular}
+  \caption{Métriques d'indexation mesurées sur CPU}
+  \label{tab:indexing}
+\end{table}
+
+DinoV2 est le plus lent (333 ms/image) en raison de la taille d'entrée $518 \times 518$ px. L'index HOG occupe 121 Mo, conséquence directe de sa dimension 8\,100.
+
+% ============================================================
+\chapter{Mesures de similarité et stratégie de recherche}
+% ============================================================
+
+\section{Mesures de similarité}
+
+Cinq mesures sont implémentées en deux formes chacune : scalaire pairwise et vectorisée batch (query vs. toute la base).
+
+\textbf{Distance euclidienne.} Pour des vecteurs L2-normalisés, l'identité $\|\mathbf{a}-\mathbf{b}\|^2 = 2 - 2\,\mathbf{a}^\top\mathbf{b}$ évite d'allouer une matrice de différences $N \times D$. Le batch se réduit à un produit matriciel unique.
+
+\textbf{Distance cosinus.} $d_{\cos}(\mathbf{a},\mathbf{b}) = 1 - \frac{\mathbf{a}^\top\mathbf{b}}{\|\mathbf{a}\|\|\mathbf{b}\|}$. Sur vecteurs normalisés, équivalente à l'euclidienne.
+
+\textbf{Chi-deux.} $d_{\chi^2}(\mathbf{a},\mathbf{b}) = \frac{1}{2}\sum_i \frac{(a_i - b_i)^2}{a_i + b_i}$, calculée sur les bins où $a_i + b_i > 0$. Adaptée aux histogrammes.
+
+\textbf{Jensen-Shannon.} Divergence KL symétrisée et bornée dans $[0,1]$ :
+\[
+  d_{\text{JS}}(p,q) = \frac{1}{2}D_{\text{KL}}\!\left(p \,\|\, \tfrac{p+q}{2}\right) + \frac{1}{2}D_{\text{KL}}\!\left(q \,\|\, \tfrac{p+q}{2}\right)
+\]
+Les vecteurs sont décalés pour être non-négatifs et normalisés en somme avant calcul.
+
+\textbf{Hamming (ORB uniquement).} Les vecteurs flottants sont binarisés par seuil adaptatif (moyenne du vecteur) avant calcul de la fraction de bits différents. Cette mesure est restreinte au descripteur ORB seul.
+
+\section{Normalisation avant concaténation}
+
+Avant de concaténer plusieurs descripteurs, chaque matrice est normalisée en L2 ligne par ligne. Sans cette étape, un descripteur de grande dimension dominerait la distance combinée par effet de volume.
+
+\section{Recherche exacte par tri}
+
+La recherche est un k-NN exact : les distances entre la requête et les 5\,000 vecteurs de la base sont calculées en batch, puis triées par \texttt{np.argsort}. L'image requête est exclue en fixant sa distance à $+\infty$.
+
+\begin{lstlisting}[style=python, caption={Noyau de recherche (app/searcher.py)}]
+distances = batch_fn(query_vec, db_matrix).astype(np.float32)
+distances[query_idx] = np.inf
+ranked = np.argsort(distances)
+results = ranked[:top_k]   # top-20 ou top-50
+\end{lstlisting}
+
+Sur 5\,000 vecteurs, le tri complet est acceptable. Il n'y a pas d'index ANN côté unimodal.
+
+\section{Cache en mémoire}
+
+Deux niveaux de cache évitent de recalculer à chaque requête :
+\begin{enumerate}
+  \item \textbf{Cache brut} : matrices chargées depuis les fichiers \texttt{.npz}.
+  \item \textbf{Cache préparé} : matrices normalisées L2 et éventuellement réduites par ACP, indexées par \texttt{(descripteur, mesure)}.
+\end{enumerate}
+
+\section{Réduction de dimension par ACP}
+\label{sec:pca}
+
+HOG produit des vecteurs de 8\,100 dimensions. Appliqué tel quel à Jensen-Shannon ou Chi-deux, il pose deux problèmes : des centaines de bins quasi-nuls perturbent le calcul logarithmique, et la matrice de différences intermédiaire occuperait $5000 \times 8100 \times 4 \approx 162$ Mo par requête.
+
+Une ACP réduit HOG à 256 dimensions. Elle est ajustée par SVD tronquée sur 2\,000 vecteurs aléatoires, sauvegardée sur disque (\texttt{hog\_pca256.npz}) et rechargée en mémoire. La projection est :
+\[
+  \tilde{\mathbf{f}} = (\mathbf{f} - \boldsymbol{\mu})\,\mathbf{V}_{256}^\top
+\]
+L'ACP n'est activée que pour HOG avec Jensen-Shannon ou Chi-deux. Pour les autres combinaisons, les vecteurs bruts normalisés sont utilisés.
+
+% ============================================================
+\chapter{Métriques d'évaluation et résultats}
+% ============================================================
+
+\section{Métriques}
+
+\begin{align*}
+  P@K &= \frac{|\text{pertinents dans top-}K|}{K} \\[4pt]
+  R@K &= \frac{|\text{pertinents dans top-}K|}{N_c - 1} \\[4pt]
+  AP  &= \frac{1}{N_c-1}\sum_{k=1}^{K} P@k \cdot \mathbf{1}[\text{rang }k\text{ pertinent}] \\[4pt]
+  R\text{-}P &= P@(N_c-1) \\[4pt]
+  MAP &= \frac{1}{|Q|}\sum_{q \in Q} AP(q)
+\end{align*}
+
+La MAP est calculée sur les 46 requêtes (une par classe). C'est la métrique synthétique principale.
+
+\section{Temps de réponse à chaud}
+
+\begin{table}[H]
+  \centering
+  \begin{tabular}{llr}
+    \toprule
+    Descripteur & Mesure & Temps (ms) \\
+    \midrule
+    color\_histogram & euclidean & $< 5$ \\
+    hog              & euclidean & $\approx 45$ \\
+    hog              & jensen    & $\approx 28$ (avec ACP) \\
+    mobilenetv2      & cosine    & $\approx 30$ \\
+    dinov2           & cosine    & $\approx 20$ \\
+    hog + sift + color & euclidean & $\approx 60$ \\
+    \bottomrule
+  \end{tabular}
+  \caption{Temps de réponse mesurés à chaud (CPU, cache chaud)}
+\end{table}
+
+HOG+Jensen avec ACP est plus rapide que HOG+euclidean car la matrice de produit scalaire passe de $5000 \times 8100$ à $5000 \times 256$.
+
+\section{MAP par descripteur et mesure}
+
+\todo{Remplir ce tableau. Pour chaque combinaison, exécuter \texttt{POST /api/map} avec \texttt{top\_k=50}, \texttt{max\_queries=46}.}
+
+\begin{table}[H]
+  \centering
+  \begin{tabular}{lllll}
+    \toprule
+    Descripteur & Mesure & MAP@20 & MAP@50 & R-Prec. \\
+    \midrule
+    color\_histogram & euclidean  & -- & -- & -- \\
+    color\_histogram & jensen     & -- & -- & -- \\
+    hog              & euclidean  & -- & -- & -- \\
+    hog              & jensen     & -- & -- & -- \\
+    sift             & euclidean  & -- & -- & -- \\
+    orb              & hamming    & -- & -- & -- \\
+    mobilenetv2      & cosine     & -- & -- & -- \\
+    resnet50         & cosine     & -- & -- & -- \\
+    vit\_base        & cosine     & -- & -- & -- \\
+    dinov2           & cosine     & -- & -- & -- \\
+    mobilenetv2 + dinov2 & cosine & -- & -- & -- \\
+    \bottomrule
+  \end{tabular}
+  \caption{MAP sur 46 requêtes. À compléter.}
+\end{table}
+
+\textbf{Hypothèses qualitatives.} Les descripteurs profonds (MobileNetV2, ResNet50, ViT, DinoV2) devraient dominer sur ce corpus car ils encodent une sémantique proche de celle apprise sur ImageNet. L'histogramme de couleur sera peu discriminant entre modèles de voitures similaires. La concaténation multi-descripteurs apportera un gain si les descripteurs combinés sont complémentaires.
+
+% ============================================================
+\part{Moteur de recherche multimodal}
+% ============================================================
+
+\chapter{CLIP et recherche texte-image}
+
+\section{Principe de CLIP}
+
+CLIP \cite{radford2021} est entraîné par apprentissage contrastif sur 400 millions de paires (image, texte) issues du web. L'objectif est de maximiser la similarité cosinus entre les embeddings d'une paire associée et de la minimiser pour les paires non associées. Le résultat est un espace commun où images et textes sont directement comparables.
+
+\section{Modèle et encodeurs}
+
+Le système utilise la variante \textbf{ViT-B/32} des poids OpenAI, chargée via \texttt{open\_clip} :
+\begin{itemize}
+  \item Encodeur image : ViT-Base, patches $32 \times 32$ px, entrée $224 \times 224$ px
+  \item Encodeur texte : Transformer 12 couches, contexte 77 tokens
+  \item Dimension de l'espace commun : 512
+  \item Précision : float16 en inférence ($\approx 175$ Mo vs $\approx 350$ Mo en float32)
+\end{itemize}
+
+L'encodeur texte est chargé uniquement à la première requête textuelle (chargement différé). Les requêtes image $\to$ texte n'en ont pas besoin.
+
+\section{Jeu de données Flickr8K}
+
+Flickr8K \cite{hodosh2013} contient \textbf{8\,091 images} (photographies variées) accompagnées chacune de \textbf{5 descriptions textuelles} humaines, soit 40\,455 paires (image, texte). Ce corpus est standard pour l'évaluation de la recherche multimodale car les 5 descriptions d'une image couvrent différentes perspectives du contenu.
+
+\section{Indexation FAISS}
+
+FAISS \cite{johnson2019} est une bibliothèque de recherche de voisins approchés sur vecteurs denses. Deux index sont construits hors-ligne :
+
+\begin{itemize}
+  \item \texttt{index\_images.faiss} : 8\,091 vecteurs d'images (512 dim.).
+  \item \texttt{index\_captions.faiss} : 40\,455 vecteurs de légendes (512 dim.).
+\end{itemize}
+
+Les vecteurs sont L2-normalisés. La recherche par similarité cosinus se ramène à un produit scalaire maximal, nativement optimisé par l'index \texttt{IndexFlatIP} de FAISS. FAISS permet de reconstruire les vecteurs stockés (\texttt{index.reconstruct(i)}), évitant de recalculer l'embedding d'une image à chaque requête image $\to$ texte.
+
+\section{Modes de recherche}
+
+\textbf{Texte $\to$ image.} La requête textuelle est encodée, puis FAISS recherche les $K$ images les plus proches dans l'espace commun. Cela permet des requêtes en langage naturel sans image exemple.
+
+\textbf{Image $\to$ texte.} Le vecteur de l'image requête est récupéré depuis \texttt{index\_images.faiss}, puis FAISS recherche les $K$ légendes les plus proches. Produit des descriptions automatiques d'une image.
+
+\section{Évaluation}
+
+La pertinence est définie selon le mode :
+\begin{itemize}
+  \item Texte $\to$ image : l'image retournée est pertinente si c'est l'image source de la légende (1 pertinent par requête).
+  \item Image $\to$ texte : une légende est pertinente si elle appartient aux 5 annotations de l'image requête.
+\end{itemize}
+
+\todo{MAP text-to-image et image-to-text sur un échantillon de Flickr8K. Lancer \texttt{POST /api/clip/evaluate}.}
+
+% ============================================================
+\part{Déploiement cloud et infrastructure}
+% ============================================================
+
+\chapter{Architecture de l'application}
+
+\section{Vue d'ensemble}
+
+L'application suit une architecture client-serveur à deux couches :
+\begin{itemize}
+  \item \textbf{Backend} : FastAPI (Python 3.11), API REST sur le port 8000.
+  \item \textbf{Frontend} : React 18 + Vite, compilé en fichiers statiques servis par FastAPI.
+\end{itemize}
+
+En production, un seul processus sert l'API et le frontend, sans reverse proxy.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  box/.style={draw, rounded corners, minimum width=2.8cm, minimum height=0.9cm, align=center, font=\small},
+  arr/.style={->, >=Stealth, thick}
+]
+  \node[box, fill=blue!10]   (browser) {Navigateur\\React};
+  \node[box, fill=green!10,  right=2.8cm of browser]   (api)     {FastAPI\\:8000};
+  \node[box, fill=orange!10, above right=0.4cm and 2cm of api]   (idx)  {Index NPZ\\+ FAISS};
+  \node[box, fill=orange!10, below right=0.4cm and 2cm of api]   (data) {Dataset\\images};
+  \node[box, fill=purple!10, above=1.2cm of api]  (clip) {CLIP\\ViT-B/32};
+
+  \draw[arr] (browser) -- node[above, font=\small]{HTTP/JSON} (api);
+  \draw[arr] (api) -- (idx);
+  \draw[arr] (api) -- (data);
+  \draw[arr] (api) -- (clip);
+\end{tikzpicture}
+\caption{Architecture générale du système}
+\end{figure}
+
+\section{API REST}
+
+\begin{table}[H]
+  \centering\small
+  \begin{tabular}{lll}
+    \toprule
+    Méthode & Chemin & Description \\
+    \midrule
+    GET  & \texttt{/api/images}              & Images paginées (filtre classe) \\
+    GET  & \texttt{/api/classes}             & 46 classes + effectifs \\
+    GET  & \texttt{/api/descriptors}         & Liste des 8 descripteurs \\
+    GET  & \texttt{/api/measures}            & Liste des 5 mesures \\
+    POST & \texttt{/api/search}              & Recherche unimodale top-20/50 \\
+    POST & \texttt{/api/map}                 & MAP sur 46 requêtes \\
+    GET  & \texttt{/api/indexing-metrics}    & Métriques d'indexation \\
+    GET  & \texttt{/api/health}              & Health check \\
+    GET  & \texttt{/api/clip/images}         & Images Flickr8K paginées \\
+    POST & \texttt{/api/clip/text-to-image}  & Requête texte $\to$ image \\
+    POST & \texttt{/api/clip/image-to-text}  & Requête image $\to$ texte \\
+    POST & \texttt{/api/clip/evaluate}       & MAP CLIP \\
+    GET  & \texttt{/\{path\}}                & SPA React (catch-all) \\
+    \bottomrule
+  \end{tabular}
+  \caption{Endpoints de l'API REST}
+\end{table}
+
+\section{Interface React}
+
+L'interface est organisée en trois onglets :
+\begin{itemize}
+  \item \textbf{Recherche} : sélection d'une image requête depuis la base, choix des descripteurs (chips), choix de la mesure, affichage des résultats top-20/50 avec code couleur vert/rouge selon la pertinence.
+  \item \textbf{MAP} : sélection des descripteurs et mesure, calcul de la MAP sur les 46 classes, AP par classe.
+  \item \textbf{Benchmark} : tableau des métriques d'indexation pour tous les descripteurs.
+\end{itemize}
+
+% ============================================================
+\chapter{Diagrammes UML}
+% ============================================================
+
+\section{Diagramme de dépendances des modules}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  mod/.style={draw, rectangle, minimum width=2.8cm, minimum height=0.8cm, align=center, font=\small},
+  dep/.style={->, >=Stealth, dashed, gray}
+]
+  \node[mod, fill=blue!10]   (main)     at (0,0)     {\texttt{main.py}};
+  \node[mod, fill=green!10]  (search)   at (-3.5,-2) {\texttt{searcher.py}};
+  \node[mod, fill=green!10]  (clip)     at (3.5,-2)  {\texttt{clip\_searcher.py}};
+  \node[mod, fill=orange!10] (measures) at (-5.5,-4) {\texttt{measures.py}};
+  \node[mod, fill=orange!10] (pca)      at (-2.5,-4) {\texttt{pca\_reducer.py}};
+  \node[mod, fill=orange!10] (metrics)  at (0.5,-4)  {\texttt{metrics.py}};
+  \node[mod, fill=purple!10] (deep)     at (3.5,-4)  {\texttt{deep\_model.py}};
+  \node[mod, fill=yellow!30] (indexer)  at (0,-2)    {\texttt{indexer.py}};
+
+  \draw[dep] (main) -- (search);
+  \draw[dep] (main) -- (clip);
+  \draw[dep] (main) -- (metrics);
+  \draw[dep] (main) -- (indexer);
+  \draw[dep] (search) -- (measures);
+  \draw[dep] (search) -- (pca);
+  \draw[dep] (indexer) -- (deep);
+\end{tikzpicture}
+\caption{Dépendances entre modules backend}
+\end{figure}
+
+\section{Diagramme de séquence -- recherche unimodale}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, >=Stealth]
+  % lignes de vie
+  \foreach \x/\lbl in {0/Client, 3/FastAPI, 6/searcher.py, 9/Cache NPZ} {
+    \draw (\x,0) -- (\x,-8);
+    \node[draw, fill=gray!15, minimum width=2cm, font=\footnotesize] at (\x, 0.35) {\lbl};
+  }
+  % messages
+  \draw[->] (0,-1) -- (3,-1)   node[midway, above, font=\tiny]{POST /api/search};
+  \draw[->] (3,-2) -- (6,-2)   node[midway, above, font=\tiny]{search(idx, desc, measure, k)};
+  \draw[->] (6,-3) -- (9,-3)   node[midway, above, font=\tiny]{\_prepare\_descriptor()};
+  \draw[->] (9,-4) -- (6,-4)   node[midway, above, font=\tiny]{matrix (depuis cache)};
+  \draw[->] (6,-5) -- (6,-5)   {};
+  \node[right, font=\tiny] at (6,-5.2) {batch\_measure(query, matrix)};
+  \node[right, font=\tiny] at (6,-5.7) {argsort $\to$ top-K};
+  \draw[->] (6,-6.5) -- (3,-6.5) node[midway, above, font=\tiny]{results[K]};
+  \draw[->] (3,-7.5) -- (0,-7.5) node[midway, above, font=\tiny]{JSON response};
+\end{tikzpicture}
+\caption{Séquence d'une requête de recherche unimodale}
+\end{figure}
+
+\section{Diagramme de cas d'utilisation}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  uc/.style={ellipse, draw, align=center, minimum width=3cm, minimum height=0.7cm, font=\small}
+]
+  \node[font=\small] (user) at (-5,0) {\textbf{Utilisateur}};
+  \node[uc] (browse) at (0, 2)   {Parcourir les images};
+  \node[uc] (search) at (0, 0.6) {Lancer une recherche};
+  \node[uc] (map)    at (0,-0.8) {Calculer la MAP};
+  \node[uc] (bench)  at (0,-2.2) {Consulter le benchmark};
+  \node[uc] (clip)   at (0,-3.6) {Recherche texte-image};
+
+  \foreach \uc in {browse,search,map,bench,clip}
+    \draw[->] (user) -- (\uc);
+\end{tikzpicture}
+\caption{Cas d'utilisation}
+\end{figure}
+
+% ============================================================
+\chapter{Cybersécurité}
+% ============================================================
+
+\section{Mesures en place}
+
+\textbf{Validation des entrées.} Toutes les requêtes API passent par des modèles Pydantic. Les champs critiques sont contraints :
+\begin{itemize}
+  \item \texttt{descriptors} : ensemble fixe de 8 valeurs admises.
+  \item \texttt{measure} : ensemble fixe de 5 valeurs admises.
+  \item \texttt{top\_k} : restreint à \{20, 50\}.
+  \item \texttt{query\_index} : entier vérifié dans $[0, N-1]$.
+\end{itemize}
+Toute valeur hors contrainte produit une réponse HTTP 400. Il n'y a pas d'exécution dynamique de code à partir des entrées utilisateur.
+
+\textbf{Absence de SQL.} Le système ne s'appuie sur aucune base de données relationnelle, éliminant le risque d'injection SQL. Les chemins de fichiers sont construits à partir d'indices entiers et de variables de configuration, jamais de chaînes utilisateur.
+
+\textbf{CORS.} Le middleware CORS FastAPI est actif. En développement, toutes les origines sont autorisées (\texttt{allow\_origins=["*"]}). Cette configuration doit être restreinte en production.
+
+\section{Limites et recommandations}
+
+\textbf{Authentification.} L'API est entièrement publique. Quiconque connaît l'URL peut déclencher des calculs coûteux (MAP sur 46 requêtes, chargement CLIP). Un rate limiting (middleware FastAPI ou reverse proxy Nginx) et une authentification par token API sont recommandés avant toute exposition publique.
+
+\textbf{CORS en production.} Restreindre \texttt{allow\_origins} à l'origine du frontend déployé.
+
+\textbf{Secrets.} Aucun secret n'est actuellement commité (pas de clé API, pas de base de données). Si des services externes sont ajoutés, les secrets doivent être injectés via des variables d'environnement, jamais versionnés.
+
+\todo{Ajouter une limite de taille sur les requêtes HTTP pour prévenir les payloads malveillants.}
+
+% ============================================================
+\chapter{Réduction de dimension vectorielle}
+% ============================================================
+
+La réduction de dimension joue deux rôles dans le système.
+
+\textbf{ACP sur HOG (unimodal).} Décrite en section \ref{sec:pca}, elle compresse HOG de 8\,100 à 256 dimensions avant les mesures de distribution. Elle est calculée une fois par SVD tronquée et mise en cache en mémoire et sur disque.
+
+\textbf{FAISS et quantification vectorielle (multimodal).} FAISS utilise en interne des techniques de quantification (IVF, PQ) pour réduire l'empreinte mémoire et accélérer la recherche. Les vecteurs CLIP (512 dim., float32) sont stockés dans un index plat \texttt{IndexFlatIP} pour Flickr8K (8\,091 et 40\,455 vecteurs respectivement) : à cette échelle, un index plat est suffisant et donne des résultats exacts.
+
+\textbf{Projection fine-tuning.} Les têtes de projection entraînées (MobileNetV2, DinoV2) réduisent les embeddings à 256 dimensions. Cette réduction n'est pas de la compression sans perte : la projection apprend à concentrer l'information discriminante pour la tâche de retrieval par voitures.
+
+% ============================================================
+\chapter{Containerisation et déploiement cloud}
+% ============================================================
+
+\section{Build Docker multi-stage}
+
+Le Dockerfile utilise deux stages pour minimiser l'image de production :
+
+\textbf{Stage 1 -- frontend-builder} (\texttt{node:20-alpine}) : installation des dépendances npm et build Vite. Les fichiers statiques générés sont copiés dans \texttt{app/static/}.
+
+\textbf{Stage 2 -- runtime} (\texttt{python:3.11-slim}) : installation d'OpenCV (\texttt{libgl1}, \texttt{libglib2.0-0}), PyTorch CPU (\texttt{torch==2.6.0+cpu}, ~500 Mo vs ~2 Go pour la version CUDA), puis des dépendances Python du projet.
+
+Le dataset (535 Mo), les index FAISS et Flickr8K sont montés en volumes Docker au runtime -- ils ne font pas partie de l'image.
+
+\section{Docker Compose}
+
+Trois volumes en lecture seule sont montés à l'exécution :
+
+\begin{lstlisting}[language=yaml, basicstyle=\ttfamily\footnotesize, frame=single]
+volumes:
+  - ./indexes_faiss:/app/indexes_faiss:ro
+  - ./dataset:/app/dataset:ro
+  - ./Flickr8K:/app/Flickr8K:ro
+\end{lstlisting}
+
+Cette organisation permet de mettre à jour les index sans reconstruire l'image.
+
+\section{Déploiement sur Railway.app}
+
+Railway.app détecte automatiquement le Dockerfile et reconstruit l'image à chaque push sur \texttt{main}. La configuration de déploiement (\texttt{railway.json}) définit :
+\begin{itemize}
+  \item Constructeur : Dockerfile.
+  \item Health check : \texttt{GET /api/health}, timeout 900 s (nécessaire pour le cold start).
+  \item Politique de redémarrage : \texttt{ON\_FAILURE}.
+\end{itemize}
+
+\section{Spécifications de la VM}
+
+\todo{Préciser : nombre de vCPUs, RAM, stockage, coût mensuel. Indiquer si les données sont sur un volume persistant ou rechargées depuis un stockage objet.}
+
+Les besoins minimaux estimés sont : 4 Go de RAM (index en mémoire + overhead Python), 4 Go de stockage (dataset + Flickr8K + index NPZ/FAISS), 2 vCPUs.
+
+% ============================================================
+\chapter*{Conclusion}
+\addcontentsline{toc}{chapter}{Conclusion}
+% ============================================================
+
+Ce projet réalise un moteur de recherche d'images combinant huit descripteurs visuels, cinq mesures de similarité et un module de recherche multimodale CLIP sur Flickr8K. L'ensemble est accessible via une interface React et déployable sur infrastructure légère grâce à une containerisation Docker multi-stage.
+
+Les éléments manquants se résument à deux catégories : les résultats expérimentaux (tableaux MAP, courbes de training) et les spécifications précises de l'infrastructure cloud déployée.
+
+% ============================================================
+\begin{thebibliography}{99}
+% ============================================================
+
+\bibitem{dalal2005}
+N. Dalal and B. Triggs, \textit{Histograms of Oriented Gradients for Human Detection}, CVPR 2005.
+
+\bibitem{lowe2004}
+D.~G. Lowe, \textit{Distinctive Image Features from Scale-Invariant Keypoints}, IJCV 60(2), 2004.
+
+\bibitem{rublee2011}
+E. Rublee et al., \textit{ORB: An Efficient Alternative to SIFT or SURF}, ICCV 2011.
+
+\bibitem{sandler2018}
+M. Sandler et al., \textit{MobileNetV2: Inverted Residuals and Linear Bottlenecks}, CVPR 2018.
+
+\bibitem{he2016}
+K. He et al., \textit{Deep Residual Learning for Image Recognition}, CVPR 2016.
+
+\bibitem{dosovitskiy2020}
+A. Dosovitskiy et al., \textit{An Image is Worth 16x16 Words}, ICLR 2021.
+
+\bibitem{oquab2023}
+M. Oquab et al., \textit{DINOv2: Learning Robust Visual Features without Supervision}, arXiv:2304.07193, 2023.
+
+\bibitem{radford2021}
+A. Radford et al., \textit{Learning Transferable Visual Models From Natural Language Supervision}, ICML 2021.
+
+\bibitem{hodosh2013}
+M. Hodosh et al., \textit{Framing Image Description as a Ranking Task}, JAIR 47, 2013.
+
+\bibitem{johnson2019}
+J. Johnson et al., \textit{Billion-Scale Similarity Search with GPUs}, IEEE Trans. Big Data, 2021.
+
+\bibitem{hermans2017}
+A. Hermans et al., \textit{In Defense of the Triplet Loss for Person Re-Identification}, arXiv:1703.07737, 2017.
+
+\end{thebibliography}
+
+\end{document}
