@@ -3,8 +3,11 @@ __pycache__/
 *.pyo
 .env
 dataset/
-indexes/
-models/
+# Gros modèles (>100 MB) — utiliser HuggingFace pour ceux-là
+models/resnet50_best.pth
+models/vit_base_best.pth
+# Index descripteurs classiques (trop lourds)
+indexes/hog.npz
 node_modules/
 app/static/
 frontend/dist/

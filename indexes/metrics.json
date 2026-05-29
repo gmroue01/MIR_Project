@@ -1,0 +1,66 @@
+{
+  "color_histogram": {
+    "indexing_time_s": 76.395,
+    "descriptor_size_mb": 0.3931,
+    "avg_search_time_s": 0.000924,
+    "num_images": 5012,
+    "descriptor_dim": 24,
+    "failed": 0
+  },
+  "hog": {
+    "indexing_time_s": 30.439,
+    "descriptor_size_mb": 121.1438,
+    "avg_search_time_s": 0.000756,
+    "num_images": 5012,
+    "descriptor_dim": 8100,
+    "failed": 0
+  },
+  "mobilenetv2": {
+    "indexing_time_s": 586.346,
+    "descriptor_size_mb": 9.0236,
+    "avg_search_time_s": 0.109646,
+    "num_images": 5012,
+    "descriptor_dim": 512,
+    "failed": 0
+  },
+  "resnet50": {
+    "indexing_time_s": 2004.216,
+    "descriptor_size_mb": 9.022,
+    "avg_search_time_s": 0.392641,
+    "num_images": 5012,
+    "descriptor_dim": 512,
+    "failed": 0
+  },
+  "vit_base": {
+    "indexing_time_s": 10218.712,
+    "descriptor_size_mb": 9.022,
+    "avg_search_time_s": 2.032234,
+    "num_images": 5012,
+    "descriptor_dim": 512,
+    "failed": 0
+  },
+  "dinov2": {
+    "indexing_time_s": 4669.117,
+    "descriptor_size_mb": 9.0209,
+    "avg_search_time_s": 0.924815,
+    "num_images": 5012,
+    "descriptor_dim": 512,
+    "failed": 0
+  },
+  "sift": {
+    "indexing_time_s": 424.549,
+    "descriptor_size_mb": 2.1069,
+    "avg_search_time_s": 0.077788,
+    "num_images": 5012,
+    "descriptor_dim": 128,
+    "failed": 0
+  },
+  "orb": {
+    "indexing_time_s": 76.563,
+    "descriptor_size_mb": 0.5041,
+    "avg_search_time_s": 0.009968,
+    "num_images": 5012,
+    "descriptor_dim": 32,
+    "failed": 0
+  }
+}
