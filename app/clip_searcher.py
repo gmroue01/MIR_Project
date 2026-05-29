@@ -16,7 +16,7 @@ import open_clip
 from typing import List, Dict, Any
 
 BASE_DIR   = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FLICKR_DIR = os.path.join(BASE_DIR, "Flickr8K")
+FLICKR_DIR = os.path.join(BASE_DIR, "Flickr8k")
 FAISS_DIR  = os.path.join(BASE_DIR, "indexes_faiss")
 
 

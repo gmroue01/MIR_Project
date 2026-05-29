@@ -3,7 +3,6 @@ Flickr8K/
 Flickr8k/
 dataset/
 indexes_faiss/
-indexes/
 dataset.zip
 datatset.tar.gz
 *.tar.gz
