@@ -1,5 +1,5 @@
 """
-On-demand PCA reduction for high-dimensional descriptors (e.g., HOG 8100→256).
+On-demand PCA reduction for high-dimensional descriptors.
 Fitted once from the existing index and cached on disk.
 Applied transparently at search time only for distribution-based measures.
 """
@@ -9,7 +9,7 @@ import numpy as np
 INDEX_DIR = os.path.join(os.path.dirname(__file__), "..", "indexes")
 
 # Descriptors that benefit from PCA for Jensen/Chi-square
-PCA_TARGETS = {"hog"}
+PCA_TARGETS: set = set()  # à remplir si un futur descripteur haute-dim en a besoin
 PCA_DIM = 256
 
 _pca_cache: dict = {}

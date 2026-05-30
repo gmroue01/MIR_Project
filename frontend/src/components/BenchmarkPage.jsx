@@ -4,24 +4,20 @@ import styles from "./BenchmarkPage.module.css";
 
 const LABELS = {
   color_histogram: "Histo. Couleur",
-  hog:            "HOG",
   mobilenetv2:    "MobileNetV2",
   resnet50:       "ResNet50",
   vit_base:       "ViT Base",
   dinov2:         "DinoV2",
   sift:           "SIFT",
-  orb:            "ORB",
 };
 
 const COLORS = {
   color_histogram: "#8b5cf6",
-  hog:            "#22d3ee",
   mobilenetv2:    "#f59e0b",
   resnet50:       "#34d399",
   vit_base:       "#f472b6",
   dinov2:         "#60a5fa",
   sift:           "#a78bfa",
-  orb:            "#fb923c",
 };
 
 function Bar({ value, max, color }) {

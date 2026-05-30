@@ -77,6 +77,9 @@
   cursor: not-allowed;
 }
 
+.chipSoon { opacity: .45; cursor: not-allowed; border-style: dashed; }
+.soonBadge { font-size: .6rem; background: rgba(99,102,241,.15); color: #a5b4fc; border-radius: 4px; padding: 1px 4px; margin-left: 4px; vertical-align: middle; }
+
 .topkRow { display: flex; gap: 8px; }
 
 .error {

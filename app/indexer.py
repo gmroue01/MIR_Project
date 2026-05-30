@@ -14,13 +14,11 @@ from tqdm import tqdm
 
 from app.descriptors import (
     color_histogram,
-    hog,
     mobilenetv2,
     resnet50,
     vit_base,
     dinov2,
     sift,
-    orb,
 )
 
 DATASET_DIR = os.path.join(os.path.dirname(__file__), "..", "dataset")
@@ -28,13 +26,12 @@ INDEX_DIR = os.path.join(os.path.dirname(__file__), "..", "indexes")
 
 DESCRIPTORS = {
     "color_histogram": color_histogram.extract,
-    "hog": hog.extract,
     "mobilenetv2": mobilenetv2.extract,
     "resnet50": resnet50.extract,
     "vit_base": vit_base.extract,
     "dinov2": dinov2.extract,
     "sift": sift.extract,
-    "orb": orb.extract,
+    # "sift_ransac": à venir (nécessite une recherche en ligne, pas d'index statique)
 }
 
 

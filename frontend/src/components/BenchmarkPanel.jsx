@@ -4,13 +4,11 @@ import styles from "./BenchmarkPanel.module.css";
 
 const DESCRIPTOR_LABELS = {
   color_histogram: "Histo. Couleur",
-  hog: "HOG",
   mobilenetv2: "MobileNetV2",
   resnet50: "ResNet50",
   vit_base: "ViT Base",
   dinov2: "DinoV2",
   sift: "SIFT",
-  orb: "ORB",
 };
 
 function Bar({ value, max, color }) {

@@ -4,7 +4,7 @@ Similarity/distance measures in two forms:
 - batch(query, matrix): vectorized 1-D array of distances from query to every row in matrix
 """
 import numpy as np
-from scipy.spatial.distance import cosine, hamming
+from scipy.spatial.distance import cosine
 
 
 # ---------- Pairwise (scalar) ----------
@@ -35,12 +35,6 @@ def jensen_shannon(a: np.ndarray, b: np.ndarray) -> float:
     js = 0.5 * np.sum(p * np.log((p + eps) / (m + eps))) + \
          0.5 * np.sum(q * np.log((q + eps) / (m + eps)))
     return float(np.clip(js, 0.0, 1.0))
-
-
-def hamming_distance(a: np.ndarray, b: np.ndarray) -> float:
-    a_bin = (a > a.mean()).astype(np.uint8)
-    b_bin = (b > b.mean()).astype(np.uint8)
-    return float(hamming(a_bin, b_bin))
 
 
 # ---------- Batch (vectorized: query vs full matrix) ----------
@@ -88,12 +82,6 @@ def jensen_shannon_batch(query: np.ndarray, matrix: np.ndarray) -> np.ndarray:
     return np.clip(0.5 * (kl_p + kl_q), 0.0, 1.0)
 
 
-def hamming_batch(query: np.ndarray, matrix: np.ndarray) -> np.ndarray:
-    q_bin = (query > query.mean()).astype(np.uint8)
-    m_bin = (matrix > matrix.mean(axis=1, keepdims=True)).astype(np.uint8)
-    return np.mean(q_bin != m_bin, axis=1).astype(np.float32)
-
-
 # ---------- Dispatch ----------
 
 MEASURES = {
@@ -101,7 +89,6 @@ MEASURES = {
     "cosine":     cosine_distance,
     "chi_square": chi_square,
     "jensen":     jensen_shannon,
-    "hamming":    hamming_distance,
 }
 
 BATCH_MEASURES = {
@@ -109,5 +96,4 @@ BATCH_MEASURES = {
     "cosine":     cosine_batch,
     "chi_square": chi_square_batch,
     "jensen":     jensen_shannon_batch,
-    "hamming":    hamming_batch,
 }

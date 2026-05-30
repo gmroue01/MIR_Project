@@ -70,24 +70,22 @@ def list_classes():
 
 @app.get("/api/descriptors")
 def list_descriptors():
-    return {"descriptors": ["color_histogram", "hog", "mobilenetv2", "resnet50", "vit_base", "dinov2", "sift", "orb"]}
+    return {"descriptors": ["color_histogram", "mobilenetv2", "resnet50", "vit_base", "dinov2", "sift"]}
 
 
 @app.get("/api/measures")
 def list_measures():
-    return {"measures": list(MEASURES.keys()), "hamming_only_orb": True}
+    return {"measures": list(MEASURES.keys())}
 
 
 @app.post("/api/search")
 def search_endpoint(req: SearchRequest):
-    valid_descriptors = {"color_histogram", "hog", "mobilenetv2", "resnet50", "vit_base", "dinov2", "sift", "orb"}
+    valid_descriptors = {"color_histogram", "mobilenetv2", "resnet50", "vit_base", "dinov2", "sift"}
     for d in req.descriptors:
         if d not in valid_descriptors:
             raise HTTPException(400, f"Unknown descriptor: {d}")
     if req.measure not in MEASURES:
         raise HTTPException(400, f"Unknown measure: {req.measure}")
-    if req.measure == "hamming" and not (len(req.descriptors) == 1 and req.descriptors[0] == "orb"):
-        raise HTTPException(400, "Hamming distance is only available with ORB as sole descriptor.")
     if req.top_k not in (20, 50):
         raise HTTPException(400, "top_k must be 20 or 50.")
 
@@ -144,7 +142,7 @@ def compute_map(req: MapRequest):
     Compute Mean Average Precision over a sample of queries (one per class).
     Returns per-class AP and overall MAP.
     """
-    valid_descriptors = {"color_histogram", "hog", "mobilenetv2", "resnet50", "vit_base", "dinov2", "sift", "orb"}
+    valid_descriptors = {"color_histogram", "mobilenetv2", "resnet50", "vit_base", "dinov2", "sift"}
     for d in req.descriptors:
         if d not in valid_descriptors:
             raise HTTPException(400, f"Unknown descriptor: {d}")

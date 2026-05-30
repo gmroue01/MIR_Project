@@ -4,13 +4,12 @@ import styles from "./Step2Params.module.css";
 
 const DESCRIPTORS = [
   { id: "color_histogram", label: "Histo. Couleur" },
-  { id: "hog",             label: "HOG" },
   { id: "mobilenetv2",     label: "MobileNetV2" },
   { id: "resnet50",        label: "ResNet50" },
   { id: "vit_base",        label: "ViT Base" },
   { id: "dinov2",          label: "DinoV2" },
   { id: "sift",            label: "SIFT" },
-  { id: "orb",             label: "ORB" },
+  { id: "sift_ransac",     label: "SIFT-RANSAC", soon: true },
 ];
 
 const MEASURES = [
@@ -18,26 +17,23 @@ const MEASURES = [
   { id: "cosine",     label: "Cosinus" },
   { id: "chi_square", label: "Chi-carré" },
   { id: "jensen",     label: "Jensen-Shannon" },
-  { id: "hamming",    label: "Hamming", orbOnly: true },
 ];
 
 export default function Step2Params({ queryImage, config, onChange, onSearch, searching, setSearching, onBack }) {
   const [error, setError] = useState("");
 
   const { descriptors, measure, topK } = config;
-  const orbOnly = descriptors.length === 1 && descriptors[0] === "orb";
 
   const toggleDesc = (id) => {
     const next = descriptors.includes(id)
       ? descriptors.filter(d => d !== id)
       : [...descriptors, id];
     if (next.length === 0) return;
-    onChange({ ...config, descriptors: next, measure: next.length === 1 && next[0] === "orb" ? measure : measure === "hamming" ? "euclidean" : measure });
+    onChange({ ...config, descriptors: next });
   };
 
   const handleSearch = async () => {
     if (!queryImage) { setError("Aucune image sélectionnée."); return; }
-    if (measure === "hamming" && !orbOnly) { setError("Hamming est disponible uniquement avec ORB seul."); return; }
     setError("");
     setSearching(true);
     try {
@@ -94,10 +90,12 @@ export default function Step2Params({ queryImage, config, onChange, onSearch, se
               {DESCRIPTORS.map(d => (
                 <button
                   key={d.id}
-                  className={`${styles.chip} ${descriptors.includes(d.id) ? styles.chipOn : ""}`}
-                  onClick={() => toggleDesc(d.id)}
+                  className={`${styles.chip} ${descriptors.includes(d.id) ? styles.chipOn : ""} ${d.soon ? styles.chipSoon : ""}`}
+                  onClick={() => !d.soon && toggleDesc(d.id)}
+                  disabled={d.soon}
+                  title={d.soon ? "Bientôt disponible" : ""}
                 >
-                  {d.label}
+                  {d.label}{d.soon && <span className={styles.soonBadge}>bientôt</span>}
                 </button>
               ))}
             </div>
@@ -106,20 +104,15 @@ export default function Step2Params({ queryImage, config, onChange, onSearch, se
           <div className={styles.section}>
             <label className={styles.label}>Mesure de similarité</label>
             <div className={styles.chips}>
-              {MEASURES.map(m => {
-                const disabled = m.orbOnly && !orbOnly;
-                return (
-                  <button
-                    key={m.id}
-                    className={`${styles.chip} ${measure === m.id ? styles.chipOn : ""} ${disabled ? styles.chipOff : ""}`}
-                    onClick={() => !disabled && onChange({ ...config, measure: m.id })}
-                    title={disabled ? "Hamming disponible uniquement avec ORB seul" : ""}
-                    disabled={disabled}
-                  >
-                    {m.label}
-                  </button>
-                );
-              })}
+              {MEASURES.map(m => (
+                <button
+                  key={m.id}
+                  className={`${styles.chip} ${measure === m.id ? styles.chipOn : ""}`}
+                  onClick={() => onChange({ ...config, measure: m.id })}
+                >
+                  {m.label}
+                </button>
+              ))}
             </div>
           </div>
 

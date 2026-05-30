@@ -4,13 +4,11 @@ import styles from "./MapPanel.module.css";
 
 const DESCRIPTORS = [
   { id: "color_histogram", label: "Histo. Couleur" },
-  { id: "hog", label: "HOG" },
   { id: "mobilenetv2", label: "MobileNetV2" },
   { id: "resnet50", label: "ResNet50" },
   { id: "vit_base", label: "ViT Base" },
   { id: "dinov2", label: "DinoV2" },
   { id: "sift", label: "SIFT" },
-  { id: "orb", label: "ORB" },
 ];
 
 const MEASURES = [
@@ -18,7 +16,6 @@ const MEASURES = [
   { id: "cosine", label: "Cosinus" },
   { id: "chi_square", label: "Chi-square" },
   { id: "jensen", label: "Jensen-Shannon" },
-  { id: "hamming", label: "Hamming (ORB)" },
 ];
 
 export default function MapPanel() {
@@ -29,21 +26,14 @@ export default function MapPanel() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const orbOnly = selectedDescriptors.length === 1 && selectedDescriptors[0] === "orb";
-
   const toggleDescriptor = (id) => {
     setSelectedDescriptors((prev) => {
       const next = prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id];
       return next.length === 0 ? prev : next;
     });
-    if (measure === "hamming" && id !== "orb") setMeasure("euclidean");
   };
 
   const handleCompute = async () => {
-    if (measure === "hamming" && !orbOnly) {
-      setError("Hamming nécessite uniquement ORB.");
-      return;
-    }
     setError("");
     setLoading(true);
     setResult(null);
@@ -87,18 +77,15 @@ export default function MapPanel() {
         <div className={styles.controlGroup}>
           <label className={styles.label}>Mesure</label>
           <div className={styles.chips}>
-            {MEASURES.map((m) => {
-              const disabled = m.id === "hamming" && !orbOnly;
-              return (
-                <button
-                  key={m.id}
-                  className={`${styles.chip} ${measure === m.id ? styles.chipActive : ""} ${disabled ? styles.chipDisabled : ""}`}
-                  onClick={() => !disabled && setMeasure(m.id)}
-                >
-                  {m.label}
-                </button>
-              );
-            })}
+            {MEASURES.map((m) => (
+              <button
+                key={m.id}
+                className={`${styles.chip} ${measure === m.id ? styles.chipActive : ""}`}
+                onClick={() => setMeasure(m.id)}
+              >
+                {m.label}
+              </button>
+            ))}
           </div>
         </div>
 
